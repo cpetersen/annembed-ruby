@@ -5,7 +5,8 @@ High-performance dimensionality reduction for Ruby, powered by the [annembed](ht
 ## Features
 
 - **Multiple algorithms**: UMAP, t-SNE, LargeVis, and Diffusion Maps for dimensionality reduction
-- **SVD**: Randomized Singular Value Decomposition for linear dimensionality reduction
+- **Linear methods**: PCA and SVD for fast linear dimensionality reduction
+- **Clustering**: K-means clustering with automatic k selection via elbow method
 - **High performance**: Leverages Rust's speed and parallelization
 - **Easy to use**: Simple, scikit-learn-like API
 - **Model persistence**: Save and load trained models
@@ -38,7 +39,6 @@ Copy and paste this into IRB to try out the main features:
 
 ```ruby
 require 'annembed'
-require 'annembed/svd'  # For SVD functionality
 
 # Generate sample high-dimensional data
 # Imagine this is text embeddings, image features, or any high-dim data
@@ -135,7 +135,6 @@ For convenience, you can also use the simplified API:
 
 ```ruby
 require 'annembed'
-require 'annembed/svd'
 
 # Generate sample data
 data = Array.new(100) { Array.new(50) { rand } }
@@ -193,6 +192,109 @@ u, s, vt = AnnEmbed.svd(matrix, k, n_iter: 2)
 data = Array.new(100) { Array.new(50) { rand } }
 u, s, vt = AnnEmbed.svd(data, 10)
 reduced_data = u  # This is your reduced 100×10 data
+```
+
+### AnnEmbed::PCA
+
+Principal Component Analysis for linear dimensionality reduction.
+
+```ruby
+# Simple PCA
+pca = AnnEmbed::PCA.new(n_components: 2)
+transformed = pca.fit_transform(data)
+
+# Check explained variance
+puts "Explained variance ratio: #{pca.explained_variance_ratio}"
+puts "Cumulative variance: #{pca.cumulative_explained_variance_ratio}"
+
+# Inverse transform to reconstruct data
+reconstructed = pca.inverse_transform(transformed)
+
+# Module-level convenience method
+transformed = AnnEmbed.pca(data, n_components: 2)
+```
+
+### AnnEmbed::Clustering
+
+K-means clustering for grouping similar data points.
+
+```ruby
+# Simple clustering
+kmeans = AnnEmbed::Clustering::KMeans.new(k: 3)
+labels = kmeans.fit_predict(data)
+
+# Advanced usage with all options
+kmeans = AnnEmbed::Clustering::KMeans.new(
+  k: 5,              # Number of clusters
+  max_iter: 300,     # Maximum iterations
+  random_seed: 42    # For reproducibility
+)
+
+# Fit the model
+kmeans.fit(data)
+
+# Get cluster assignments
+labels = kmeans.labels
+
+# Get cluster centers
+centers = kmeans.cluster_centers
+
+# Get inertia (sum of squared distances to nearest centroid)
+inertia = kmeans.inertia
+
+# Predict clusters for new data
+new_labels = kmeans.predict(new_data)
+
+# Find optimal k using elbow method
+results = AnnEmbed::Clustering.elbow_method(data, k_range: 2..10)
+# Returns hash: {2 => inertia_k2, 3 => inertia_k3, ...}
+
+# Detect optimal k from elbow results
+optimal_k = AnnEmbed::Clustering.detect_optimal_k(results)
+# Returns the k value at the "elbow" of the curve
+
+# Or do it all automatically
+optimal_k, labels, centroids, inertia = AnnEmbed::Clustering.optimal_kmeans(data, k_range: 2..10)
+# Automatically finds optimal k and performs clustering
+
+# Calculate clustering quality with silhouette score
+score = AnnEmbed::Clustering.silhouette_score(data, labels)
+# Returns value between -1 (poor) and 1 (excellent)
+```
+
+#### Complete Clustering Workflow
+
+```ruby
+require 'annembed'
+
+# 1. Load or generate high-dimensional data
+data = load_your_data()  # e.g., text embeddings, image features
+
+# 2. Reduce dimensions for better clustering
+umap = AnnEmbed::Embedder.new(method: :umap, n_components: 2)
+reduced_data = umap.fit_transform(data)
+
+# 3. Find optimal number of clusters automatically
+optimal_k, labels, centroids, inertia = AnnEmbed::Clustering.optimal_kmeans(
+  reduced_data, 
+  k_range: 2..10
+)
+puts "Found #{optimal_k} clusters with inertia: #{inertia.round(2)}"
+
+# Or manually with more control:
+# elbow_results = AnnEmbed::Clustering.elbow_method(reduced_data, k_range: 2..10)
+# optimal_k = AnnEmbed::Clustering.detect_optimal_k(elbow_results)
+# kmeans = AnnEmbed::Clustering::KMeans.new(k: optimal_k, random_seed: 42)
+# labels = kmeans.fit_predict(reduced_data)
+
+# 5. Evaluate clustering quality
+silhouette = AnnEmbed::Clustering.silhouette_score(reduced_data, labels)
+puts "Silhouette score: #{silhouette.round(3)}"
+
+# 6. Use clusters for downstream tasks
+labels.each_with_index do |cluster_id, point_idx|
+  puts "Point #{point_idx} belongs to cluster #{cluster_id}"
+end
 ```
 
 ### AnnEmbed::UMAP

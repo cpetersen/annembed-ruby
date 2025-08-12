@@ -1,4 +1,4 @@
-use magnus::{function, prelude::*, Error, Value, RArray};
+use magnus::{function, prelude::*, Error, Value, RArray, TryConvert};
 use annembed::tools::svdapprox::{SvdApprox, RangeApproxMode, RangeRank, MatRepr};
 use ndarray::Array2;
 
@@ -15,7 +15,7 @@ pub fn init(parent: &magnus::RModule) -> Result<(), Error> {
 
 fn randomized_svd(matrix: Value, k: usize, n_iter: usize) -> Result<RArray, Error> {
     // Convert Ruby array to ndarray
-    let rarray: RArray = matrix.try_convert()?;
+    let rarray: RArray = TryConvert::try_convert(matrix)?;
     
     // Check if it's a 2D array
     let first_row: RArray = rarray.entry::<RArray>(0)?;

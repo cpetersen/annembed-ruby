@@ -92,6 +92,9 @@ end
 desc "Run all CI checks"
 task ci: ["rust:fmt", "rust:clippy", "compile", "spec", "coverage"]
 
+# Load custom rake tasks
+Dir.glob('lib/tasks/*.rake').each { |r| load r }
+
 # Test fixture generation
 namespace :fixtures do
   desc "Generate real embedding fixtures for tests using red-candle"

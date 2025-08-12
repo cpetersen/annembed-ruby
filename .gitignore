@@ -85,3 +85,5 @@ Thumbs.db
 /test/reports/
 /test/tmp/
 .rspec_status
+*.html
+*.bin

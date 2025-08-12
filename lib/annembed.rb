@@ -21,10 +21,14 @@ module AnnEmbed
   autoload :UMAP, "annembed/umap"
   autoload :Embedder, "annembed/embedder"
   autoload :Config, "annembed/config"
-  autoload :SVD, "annembed/svd"
   autoload :Utils, "annembed/utils"
   autoload :Preprocessing, "annembed/preprocessing"
   autoload :Silence, "annembed/silence"
+  
+  # SVD, PCA and Clustering need special handling - require them after the extension is loaded
+  require_relative "annembed/svd"
+  require_relative "annembed/pca"
+  require_relative "annembed/clustering"
 
   class << self
     # Quick UMAP embedding

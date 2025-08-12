@@ -3,6 +3,7 @@ use magnus::{define_module, Error};
 mod embedder;
 mod svd;
 mod utils;
+mod clustering;
 
 #[cfg(test)]
 mod tests;
@@ -15,6 +16,7 @@ fn init() -> Result<(), Error> {
     embedder::init(&module)?;
     svd::init(&module)?;
     utils::init(&module)?;
+    clustering::init(&module)?;
     
     Ok(())
 }
