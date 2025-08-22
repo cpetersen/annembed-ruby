@@ -44,7 +44,7 @@ ClusterKit organizes its functionality into clear modules:
 
 - **`ClusterKit::Dimensionality`** - All dimensionality reduction algorithms
   - `ClusterKit::Dimensionality::UMAP` - UMAP implementation
-  - `ClusterKit::Dimensionality::PCA` - PCA implementation  
+  - `ClusterKit::Dimensionality::PCA` - PCA implementation
   - `ClusterKit::Dimensionality::SVD` - SVD implementation
 - **`ClusterKit::Clustering`** - All clustering algorithms
   - `ClusterKit::Clustering::KMeans` - K-means clustering
@@ -96,7 +96,7 @@ data = []
 3.times do |cluster|
   # Each cluster has a different center, well-separated
   center = Array.new(50) { rand * 0.1 + cluster * 2.0 }
-  
+
   # Add 33 points around each center with controlled noise
   33.times do
     point = center.map { |c| c + (rand - 0.5) * 0.3 }
@@ -423,7 +423,7 @@ search_index = ClusterKit::HNSW.new(
 # Add all documents
 documents.each_with_index do |doc, i|
   search_index.add_item(
-    embeddings[i], 
+    embeddings[i],
     label: i,
     metadata: { title: doc[:title], url: doc[:url] }
   )
@@ -433,7 +433,7 @@ end
 def search(query, index, k: 10)
   query_embedding = generate_embedding(query)
   results = index.search_with_metadata(query_embedding, k: k)
-  
+
   results.map do |result|
     {
       title: result[:metadata]['title'],
@@ -572,7 +572,7 @@ This error occurs when UMAP cannot find enough neighbors for some points. Soluti
    ```ruby
    # Bad: Pure random data with no structure
    data = Array.new(100) { Array.new(50) { rand } }
-   
+
    # Good: Data with clusters or patterns (see Quick Start example)
    # Create clusters with centers and add points around them
    ```
