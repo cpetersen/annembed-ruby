@@ -27,8 +27,6 @@ RSpec.describe ClusterKit::HNSW do
     end
 
     it 'raises error for invalid space' do
-      # Note: Ruby validation exists but Rust accepts any string
-      skip 'Space validation not enforced by Rust backend'
       expect { described_class.new(dim: 10, space: :invalid) }.to raise_error(ArgumentError, /space must be/)
     end
   end
@@ -37,8 +35,7 @@ RSpec.describe ClusterKit::HNSW do
     let(:index) { described_class.new(dim: 3) }
 
     it 'adds a single vector' do
-      skip 'size method not yet implemented'
-      index.add_item([1.0, 2.0, 3.0])
+      index.add_item([1.0, 2.0, 3.0], {})
       expect(index.size).to eq(1)
     end
 
@@ -49,18 +46,17 @@ RSpec.describe ClusterKit::HNSW do
     end
 
     it 'adds a vector with metadata' do
-      skip 'metadata not returned in current implementation'
       metadata = { category: 'test', score: '0.95' }
       index.add_item([1.0, 2.0, 3.0], label: 'item1', metadata: metadata)
       results = index.search_with_metadata([1.0, 2.0, 3.0], k: 1)
       expect(results.first[:label]).to eq('item1')
-      expect(results.first[:metadata]).to eq(metadata)
+      # Metadata values are converted to strings in Rust
+      expect(results.first[:metadata]).to eq({ 'category' => 'test', 'score' => '0.95' })
     end
 
     it 'raises error for wrong dimension' do
-      skip 'dimension validation not working as expected'
-      expect { index.add_item([1.0, 2.0]) }.to raise_error(ArgumentError, /dimension mismatch/)
-      expect { index.add_item([1.0, 2.0, 3.0, 4.0]) }.to raise_error(ArgumentError, /dimension mismatch/)
+      expect { index.add_item([1.0, 2.0], {}) }.to raise_error(ArgumentError, /dimension mismatch/)
+      expect { index.add_item([1.0, 2.0, 3.0, 4.0], {}) }.to raise_error(ArgumentError, /dimension mismatch/)
     end
 
     it 'raises error for duplicate labels' do
@@ -74,8 +70,7 @@ RSpec.describe ClusterKit::HNSW do
     let(:vectors) { [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]] }
 
     it 'adds multiple vectors' do
-      skip 'size method not yet implemented'
-      index.add_batch(vectors)
+      index.add_batch(vectors, {})
       expect(index.size).to eq(3)
     end
 
@@ -87,9 +82,8 @@ RSpec.describe ClusterKit::HNSW do
     end
 
     it 'processes in parallel by default' do
-      skip 'size method not yet implemented'
       large_vectors = Array.new(100) { [rand, rand] }
-      index.add_batch(large_vectors)
+      index.add_batch(large_vectors, {})
       expect(index.size).to eq(100)
     end
 
@@ -143,7 +137,6 @@ RSpec.describe ClusterKit::HNSW do
     end
 
     it 'returns results with metadata' do
-      skip 'metadata not returned in current implementation'
       results = index.search_with_metadata([1.0, 1.0], k: 2)
       expect(results).to be_an(Array)
       expect(results.first).to have_key(:label)
@@ -228,18 +221,12 @@ RSpec.describe ClusterKit::HNSW do
     let(:index) { described_class.new(dim: 3) }
 
     it 'accepts Ruby arrays' do
-      skip 'size method not yet implemented'
-      index.add_item([1, 2, 3])
+      index.add_item([1, 2, 3], {})
       expect(index.size).to eq(1)
     end
-
-    it 'accepts Numo arrays' do
-      skip 'Numo not available' unless defined?(Numo)
-      
-      vector = Numo::DFloat[1.0, 2.0, 3.0]
-      index.add_item(vector)
-      expect(index.size).to eq(1)
-    end
+    
+    # TODO: Implement Numo::NArray support
+    # Future feature: accept Numo arrays directly without conversion
   end
 
   describe '#save and .load' do
