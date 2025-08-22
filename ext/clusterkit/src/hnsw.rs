@@ -45,8 +45,23 @@ impl HnswIndex {
         let dim: usize = TryConvert::try_convert(dim_value)
             .map_err(|_| Error::new(exception::arg_error(), "dim must be an integer"))?;
         
+        // Validate dimension
+        if dim == 0 {
+            return Err(Error::new(exception::arg_error(), "dim must be a positive integer (got 0)"));
+        }
+        
         let space: String = if let Some(v) = kwargs.delete(Symbol::new("space"))? {
-            TryConvert::try_convert(v).unwrap_or_else(|_| "euclidean".to_string())
+            // Convert Ruby symbol to string properly
+            if let Ok(sym) = Symbol::try_convert(v) {
+                sym.name()?.to_string()
+            } else if let Ok(s) = String::try_convert(v) {
+                s
+            } else {
+                return Err(Error::new(
+                    exception::type_error(),
+                    "space must be a string or symbol"
+                ));
+            }
         } else {
             "euclidean".to_string()
         };
@@ -75,33 +90,33 @@ impl HnswIndex {
             None
         };
         
-        // Determine distance type
+        // Validate and convert space parameter
+        // For now, only support Euclidean distance
         let distance_type = match space.as_str() {
             "euclidean" => DistanceType::Euclidean,
-            "cosine" => DistanceType::Cosine,
-            "inner_product" => DistanceType::InnerProduct,
+            "cosine" => {
+                return Err(Error::new(
+                    exception::runtime_error(),
+                    "Cosine distance is not yet implemented, please use :euclidean"
+                ));
+            },
+            "inner_product" => {
+                return Err(Error::new(
+                    exception::runtime_error(),
+                    "Inner product distance is not yet implemented, please use :euclidean"
+                ));
+            },
             _ => return Err(Error::new(
                 exception::arg_error(),
-                format!("Unknown space: {}. Use 'euclidean', 'cosine', or 'inner_product'", space)
+                format!("space must be :euclidean, :cosine, or :inner_product (got: {})", space)
             )),
         };
         
-        // Create HNSW instance based on distance type and seed
-        let hnsw = match (distance_type, random_seed) {
-            (DistanceType::Euclidean, Some(seed)) => {
-                Hnsw::<f32, DistL2>::new_with_seed(m, max_elements, 16, ef_construction, DistL2, seed)
-            },
-            (DistanceType::Euclidean, None) => {
-                Hnsw::<f32, DistL2>::new(m, max_elements, 16, ef_construction, DistL2)
-            },
-            _ => {
-                // For now, only support Euclidean distance
-                // TODO: Add support for other distance types
-                return Err(Error::new(
-                    exception::runtime_error(),
-                    "Currently only 'euclidean' distance is fully implemented"
-                ));
-            }
+        // Create HNSW instance with Euclidean distance
+        let hnsw = if let Some(seed) = random_seed {
+            Hnsw::<f32, DistL2>::new_with_seed(m, max_elements, 16, ef_construction, DistL2, seed)
+        } else {
+            Hnsw::<f32, DistL2>::new(m, max_elements, 16, ef_construction, DistL2)
         };
         
         Ok(Self {
@@ -483,8 +498,16 @@ fn parse_metadata(value: Value) -> Result<HashMap<String, String>, Error> {
     let mut metadata = HashMap::new();
     
     hash.foreach(|key: Value, value: Value| {
-        let key_str: String = TryConvert::try_convert(key)
-            .map_err(|_| Error::new(exception::type_error(), "Metadata keys must be strings or symbols"))?;
+        // Handle both string and symbol keys
+        let key_str = if let Ok(s) = String::try_convert(key) {
+            s
+        } else if let Ok(sym) = Symbol::try_convert(key) {
+            sym.name()?.to_string()
+        } else {
+            return Err(Error::new(exception::type_error(), "Metadata keys must be strings or symbols"));
+        };
+        
+        // Convert value to string
         let value_str: String = TryConvert::try_convert(value)
             .map_err(|_| Error::new(exception::type_error(), "Metadata values must be strings"))?;
         
