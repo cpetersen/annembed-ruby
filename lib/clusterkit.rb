@@ -29,6 +29,7 @@ module ClusterKit
   # Load modules that depend on the extension
   require_relative "clusterkit/dimensionality"
   require_relative "clusterkit/clustering"
+  require_relative "clusterkit/hnsw"
   
   # Make RustUMAP private - it's an implementation detail
   # Users should use Dimensionality::UMAP instead
