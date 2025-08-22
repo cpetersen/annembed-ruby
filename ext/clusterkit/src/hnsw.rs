@@ -30,6 +30,7 @@ pub struct HnswIndex {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]  // These variants will be implemented in the future
 enum DistanceType {
     Euclidean,
     Cosine,
@@ -186,7 +187,7 @@ impl HnswIndex {
         
         // Add to HNSW
         {
-            let mut hnsw = self.hnsw.lock().unwrap();
+            let hnsw = self.hnsw.lock().unwrap();
             hnsw.insert((&vec_data, internal_id));
         }
         
@@ -260,7 +261,7 @@ impl HnswIndex {
         
         // Insert into HNSW
         {
-            let mut hnsw = self.hnsw.lock().unwrap();
+            let hnsw = self.hnsw.lock().unwrap();
             if parallel {
                 let data_refs: Vec<(&Vec<f32>, usize)> = data_points.iter().map(|(v, id)| (v, *id)).collect();
                 hnsw.parallel_insert(&data_refs);
