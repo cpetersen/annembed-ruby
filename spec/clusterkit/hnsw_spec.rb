@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'fileutils'
 
 RSpec.describe ClusterKit::HNSW do
   describe '#initialize' do
@@ -237,29 +238,32 @@ RSpec.describe ClusterKit::HNSW do
     end
 
     it 'saves index to file' do
-      skip 'save method has file path issues'
       path = '/tmp/test_hnsw'
       index.save(path)
-      expect(File.exist?("#{path}.hnsw")).to be true
       expect(File.exist?("#{path}.metadata")).to be true
+      expect(Dir.exist?("#{path}_hnsw_data")).to be true
+      expect(File.exist?("#{path}_hnsw_data/hnsw.hnsw.data")).to be true
+      expect(File.exist?("#{path}_hnsw_data/hnsw.hnsw.graph")).to be true
       
       # Clean up
-      File.delete("#{path}.hnsw") if File.exist?("#{path}.hnsw")
       File.delete("#{path}.metadata") if File.exist?("#{path}.metadata")
+      FileUtils.rm_rf("#{path}_hnsw_data") if Dir.exist?("#{path}_hnsw_data")
     end
 
     it 'loads index from file' do
-      skip 'Not yet implemented'
-      
       path = '/tmp/test_hnsw'
       index.save(path)
       
       loaded = described_class.load(path)
       expect(loaded.size).to eq(2)
       
-      # Clean up
-      File.delete("#{path}.hnsw") if File.exist?("#{path}.hnsw")
+      # Test that loaded index works
+      results = loaded.search([1.0, 1.0], k: 2)
+      expect(results).to include('a', 'b')
+      
+      # Clean up  
       File.delete("#{path}.metadata") if File.exist?("#{path}.metadata")
+      FileUtils.rm_rf("#{path}_hnsw_data") if Dir.exist?("#{path}_hnsw_data")
     end
   end
 end

@@ -164,13 +164,12 @@ module ClusterKit
     end
     
     # Load an index from file
+    # Note: This uses Box::leak internally to work around hnsw_rs lifetime constraints
+    # This causes a small memory leak - the HnswIo struct won't be freed until program exit
     #
     # @param path [String] File path to load from
     # @return [HNSW] New HNSW instance loaded from file
-    def self.load(path)
-      # This would need to be implemented in Rust
-      raise NotImplementedError, "Loading from file not yet implemented"
-    end
+    # (The actual implementation is in Rust)
     
     # Create an index from embeddings produced by UMAP or other dimensionality reduction
     #

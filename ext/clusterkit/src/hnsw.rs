@@ -3,12 +3,12 @@ use magnus::{
     Error, Float, Integer, RArray, RHash, RString, Symbol, Value, value, TryConvert, r_hash::ForEach
 };
 use hnsw_rs::prelude::*;
+use hnsw_rs::hnswio::HnswIo;
 // use ndarray::Array1; // Not used currently
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use std::fs::File;
-use std::io::BufWriter;
 
 // Store metadata alongside vectors
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -425,19 +425,83 @@ impl HnswIndex {
         Ok(stats)
     }
     
+    // Load index from file (class method)
+    pub fn load(path: RString) -> Result<Self, Error> {
+        let path_str = path.to_string()?;
+        
+        // Load metadata first to get dimensions and space
+        let metadata_path = format!("{}.metadata", path_str);
+        let metadata_file = File::open(&metadata_path)
+            .map_err(|e| Error::new(exception::runtime_error(), format!("Failed to open metadata file: {}", e)))?;
+        
+        let (
+            _metadata_store,
+            _label_to_id, 
+            _current_id,
+            _dim,
+            _space_str,
+        ): (
+            HashMap<usize, ItemMetadata>,
+            HashMap<String, usize>,
+            usize,
+            usize,
+            String,  // Changed from &str to String for deserialization
+        ) = bincode::deserialize_from(metadata_file)
+            .map_err(|e| Error::new(exception::runtime_error(), format!("Failed to load metadata: {}", e)))?;
+        
+        // Load HNSW structure
+        let hnsw_dir = format!("{}_hnsw_data", path_str);
+        let hnsw_path = std::path::Path::new(&hnsw_dir);
+        
+        // Create HnswIo and leak it to get 'static lifetime
+        // This is a memory leak, but necessary due to hnsw_rs lifetime constraints
+        // The memory will never be freed until the program exits
+        let hnswio = Box::new(HnswIo::new(hnsw_path, "hnsw"));
+        let hnswio_static: &'static mut HnswIo = Box::leak(hnswio);
+        
+        // Now we can load the HNSW with 'static lifetime
+        let hnsw: Hnsw<'static, f32, DistL2> = hnswio_static.load_hnsw()
+            .map_err(|e| Error::new(exception::runtime_error(), format!("Failed to load HNSW index: {}", e)))?;
+        
+        // Use the loaded metadata
+        let metadata_store = _metadata_store;
+        let label_to_id = _label_to_id;
+        let current_id = _current_id;
+        let dim = _dim;
+        let space = match _space_str.as_str() {
+            "euclidean" => DistanceType::Euclidean,
+            "cosine" => DistanceType::Cosine,
+            "inner_product" => DistanceType::InnerProduct,
+            _ => return Err(Error::new(exception::runtime_error(), "Unknown distance type in saved file")),
+        };
+        
+        // Use default ef_construction as ef_search
+        let ef_search = 200;
+        
+        Ok(Self {
+            hnsw: Arc::new(Mutex::new(hnsw)),
+            dim,
+            space,
+            metadata_store: Arc::new(Mutex::new(metadata_store)),
+            current_id: Arc::new(Mutex::new(current_id)),
+            label_to_id: Arc::new(Mutex::new(label_to_id)),
+            ef_search: Arc::new(Mutex::new(ef_search)),
+        })
+    }
+    
     // Save index to file
     pub fn save(&self, path: RString) -> Result<Value, Error> {
         let path_str = path.to_string()?;
         
+        // Create directory for HNSW structure
+        let hnsw_dir = format!("{}_hnsw_data", path_str);
+        std::fs::create_dir_all(&hnsw_dir)
+            .map_err(|e| Error::new(exception::runtime_error(), format!("Failed to create directory: {}", e)))?;
+        
         // Save HNSW structure
-        let hnsw_path = format!("{}.hnsw", path_str);
         {
             let hnsw = self.hnsw.lock().unwrap();
-            let file = File::create(&hnsw_path)
-                .map_err(|e| Error::new(exception::runtime_error(), format!("Failed to create file: {}", e)))?;
-            let _writer = BufWriter::new(file);
-            
-            hnsw.file_dump(&std::path::Path::new(&hnsw_path), "hnsw")
+            hnsw.file_dump(&std::path::Path::new(&hnsw_dir), "hnsw")
                 .map_err(|e| Error::new(exception::runtime_error(), format!("Failed to save HNSW: {}", e)))?;
         }
         
@@ -524,6 +588,7 @@ pub fn init(parent: &magnus::RModule) -> Result<(), Error> {
     let class = parent.define_class("HNSW", class::object())?;
     
     class.define_singleton_method("new", function!(HnswIndex::new, 1))?;
+    class.define_singleton_method("load", function!(HnswIndex::load, 1))?;
     class.define_method("add_item", method!(HnswIndex::add_item, 2))?;
     class.define_method("add_batch", method!(HnswIndex::add_batch, 2))?;
     class.define_method("search", method!(HnswIndex::search, 2))?;
