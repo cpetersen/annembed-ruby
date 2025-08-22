@@ -329,6 +329,124 @@ probabilities = hdbscan.probabilities      # Cluster membership probabilities
 outlier_scores = hdbscan.outlier_scores   # Outlier scores for each point
 ```
 
+### HNSW - Fast Nearest Neighbor Search
+
+ClusterKit includes HNSW (Hierarchical Navigable Small World) for fast approximate nearest neighbor search, useful for building recommendation systems, similarity search, and as a building block for other algorithms.
+
+```ruby
+# Create an HNSW index for fast similarity search
+index = ClusterKit::HNSW.new(
+  dim: 128,               # Vector dimensions
+  space: :euclidean,      # Distance metric (currently only euclidean)
+  m: 16,                  # Graph connectivity (higher = better recall, more memory)
+  ef_construction: 200,   # Build quality (higher = better graph, slower build)
+  max_elements: 10000,    # Maximum number of elements
+  random_seed: 42         # Optional: for reproducibility
+)
+
+# Add items to the index
+index.add_item([0.1, 0.2, ...], label: 'item1', metadata: { category: 'A' })
+index.add_batch(vectors, labels: labels)
+
+# Search for nearest neighbors
+results = index.search(query_vector, k: 10)
+# Returns array of labels
+
+# Search with full details
+results = index.search_with_metadata(query_vector, k: 10)
+# Returns array of hashes with :label, :distance, :metadata
+
+# Adjust search quality/speed trade-off
+index.set_ef(100)  # Higher ef = better recall, slower search
+
+# Save and load indices
+index.save('/path/to/index')
+loaded_index = ClusterKit::HNSW.load('/path/to/index')
+```
+
+#### When to Use HNSW
+
+HNSW is ideal for:
+- **Recommendation Systems**: Find similar items/users quickly
+- **Semantic Search**: Find documents with similar embeddings
+- **Duplicate Detection**: Identify near-duplicate content
+- **Clustering Support**: As a fast neighbor graph for HDBSCAN
+- **Real-time Applications**: When you need sub-millisecond search times
+
+#### Configuration Guidelines
+
+```ruby
+# High recall (>0.95) - Best quality, slower
+ClusterKit::HNSW.new(
+  dim: dim,
+  m: 32,
+  ef_construction: 400
+).tap { |idx| idx.set_ef(100) }
+
+# Balanced (>0.90 recall) - Good quality, fast
+ClusterKit::HNSW.new(
+  dim: dim,
+  m: 16,
+  ef_construction: 200
+).tap { |idx| idx.set_ef(50) }
+
+# Speed optimized (>0.85 recall) - Fastest, acceptable quality
+ClusterKit::HNSW.new(
+  dim: dim,
+  m: 8,
+  ef_construction: 100
+).tap { |idx| idx.set_ef(20) }
+```
+
+#### Important Notes
+
+1. **Memory Usage**: HNSW keeps the entire index in memory. Estimate: `(num_items * (dim * 4 + m * 16))` bytes
+2. **Distance Metrics**: Currently only Euclidean distance is fully supported
+3. **Loading Behavior**: Due to Rust lifetime constraints, loading an index creates a small memory leak (the index metadata persists until program exit). This is typically negligible for most applications.
+4. **Build Time**: Index construction is O(N * log(N)). For large datasets (>1M items), consider building offline
+
+#### Example: Semantic Search System
+
+```ruby
+# Build a simple semantic search system
+documents = load_documents()
+embeddings = generate_embeddings(documents)  # Use red-candle or similar
+
+# Build search index
+search_index = ClusterKit::HNSW.new(
+  dim: embeddings.first.size,
+  m: 16,
+  ef_construction: 200,
+  max_elements: documents.size
+)
+
+# Add all documents
+documents.each_with_index do |doc, i|
+  search_index.add_item(
+    embeddings[i], 
+    label: i,
+    metadata: { title: doc[:title], url: doc[:url] }
+  )
+end
+
+# Search function
+def search(query, index, k: 10)
+  query_embedding = generate_embedding(query)
+  results = index.search_with_metadata(query_embedding, k: k)
+  
+  results.map do |result|
+    {
+      title: result[:metadata]['title'],
+      url: result[:metadata]['url'],
+      similarity: 1.0 - result[:distance]  # Convert distance to similarity
+    }
+  end
+end
+
+# Save for later use
+search_index.save('document_index')
+```
+
 ### Visualization
 
 ClusterKit includes a built-in visualization tool:
