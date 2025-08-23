@@ -4,6 +4,7 @@ mod embedder;
 mod svd;
 mod utils;
 mod clustering;
+mod hnsw;
 
 #[cfg(test)]
 mod tests;
@@ -17,6 +18,7 @@ fn init() -> Result<(), Error> {
     svd::init(&module)?;
     utils::init(&module)?;
     clustering::init(&module)?;
+    hnsw::init(&module)?;
     
     Ok(())
 }
